@@ -1,0 +1,4 @@
+rtmpAddress: :1935
+rtspAddress: :8554
+paths:
+  all_others:

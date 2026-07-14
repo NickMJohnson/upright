@@ -142,13 +142,15 @@ def _run_live(
     return 0
 
 
-def _run_webcam(device: int) -> int:
-    return _run_live(device, "webcam.jsonl", display=True, stride=1)
+def _run_webcam(device: int, relog_s: float = 5.0) -> int:
+    return _run_live(device, "webcam.jsonl", display=True, stride=1,
+                     relog_s=relog_s)
 
 
-def _run_stream(url: str, display: bool = True, stride: int = 3) -> int:
+def _run_stream(url: str, display: bool = True, stride: int = 3,
+                relog_s: float = 5.0) -> int:
     return _run_live(url, "stream.jsonl", display=display, stride=stride,
-                     reconnect=True)
+                     reconnect=True, relog_s=relog_s)
 
 
 def _run_ingest(paths: list[str], db: str, mission: str, window: float) -> int:
@@ -222,6 +224,9 @@ def main(argv: list[str] | None = None) -> int:
 
     p_cam = sub.add_parser("webcam", help="decode from a live camera")
     p_cam.add_argument("--device", type=int, default=0)
+    p_cam.add_argument("--relog-interval", type=float, default=5.0,
+                       help="seconds before the same code is logged again "
+                            "(lower = sightings accrue faster; default 5)")
 
     p_stream = sub.add_parser("stream", help="decode a live RTMP/RTSP/HTTP stream")
     p_stream.add_argument("url")
@@ -229,6 +234,9 @@ def main(argv: list[str] | None = None) -> int:
                           help="headless mode (no preview window)")
     p_stream.add_argument("--stride", type=int, default=3,
                           help="decode every Nth frame (default 3)")
+    p_stream.add_argument("--relog-interval", type=float, default=5.0,
+                          help="seconds before the same code is logged again "
+                               "(lower = sightings accrue faster; default 5)")
 
     p_bench = sub.add_parser("benchmark",
                              help="measure decode read-rate vs drone-flight degradations")
@@ -268,9 +276,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run_images(iter_video_frames(args.path, stride=args.stride),
                            f"Video {args.path}")
     if args.cmd == "webcam":
-        return _run_webcam(args.device)
+        return _run_webcam(args.device, relog_s=args.relog_interval)
     if args.cmd == "stream":
-        return _run_stream(args.url, display=not args.no_display, stride=args.stride)
+        return _run_stream(args.url, display=not args.no_display,
+                           stride=args.stride, relog_s=args.relog_interval)
     if args.cmd == "benchmark":
         from .benchmark import main_benchmark
         return main_benchmark(args.path, trials=args.trials)

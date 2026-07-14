@@ -150,13 +150,15 @@ def observations(conn: sqlite3.Connection, mission_id: str | None = None) -> lis
         where += " AND mission_id = ?"
         args = (mission_id,)
     rows = conn.execute(
-        f"SELECT barcode, location, COUNT(*), MIN(ts), MAX(ts) "
+        f"SELECT barcode, location, COUNT(*), MIN(ts), MAX(ts), "
+        f"GROUP_CONCAT(DISTINCT symbology) "
         f"FROM scans {where} GROUP BY barcode, location",
         args,
     ).fetchall()
     return [
-        {"barcode": b, "location": loc, "sightings": n, "first_ts": t0, "last_ts": t1}
-        for b, loc, n, t0, t1 in rows
+        {"barcode": b, "location": loc, "sightings": n, "first_ts": t0,
+         "last_ts": t1, "symbologies": set((syms or "").split(",")) - {""}}
+        for b, loc, n, t0, t1, syms in rows
     ]
 
 

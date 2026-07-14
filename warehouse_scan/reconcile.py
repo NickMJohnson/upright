@@ -21,12 +21,23 @@ Verdicts:
 The threshold only gates accusations (misplaced/unexpected). Matches count at
 any sighting level — filtering observations out of matching could fabricate
 false `missing` claims.
+
+Symbology exemption: 2D codes with Reed-Solomon error correction (QR, DataMatrix,
+Aztec, PDF417) either decode correctly or not at all — they don't produce
+corrupted-but-plausible strings the way 1D scanline decoding can. Observations
+read exclusively via those symbologies skip the sightings threshold: one QR
+sighting is trustworthy.
 """
 
 from __future__ import annotations
 
 from collections import defaultdict
 from dataclasses import dataclass, field
+
+
+# Symbologies whose decoders apply Reed-Solomon correction: a returned string
+# is validated, not guessed, so single sightings are trustworthy.
+RS_CORRECTED = {"QRCODE", "DATAMATRIX", "AZTEC", "PDF417"}
 
 
 @dataclass
@@ -101,7 +112,9 @@ def reconcile(
     # expected-side evidence notes above, not as separate verdicts.
     def _accuse(kind: str, bc: str, loc: str | None, exp: str | None, o: dict,
                 note: str = "") -> Verdict:
-        if o["sightings"] < min_sightings:
+        syms = o.get("symbologies") or set()
+        rs_only = bool(syms) and syms <= RS_CORRECTED
+        if o["sightings"] < min_sightings and not rs_only:
             detail = f"would be '{kind}' but only {o['sightings']} sighting(s)"
             return Verdict("low_confidence", bc, loc, exp, o["sightings"],
                            f"{detail}; {note}" if note else detail)

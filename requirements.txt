@@ -1,0 +1,12 @@
+# Core perception pipeline
+opencv-python>=4.10
+pyzbar>=0.1.9          # requires native zbar lib: `brew install zbar` on macOS
+numpy>=1.26
+Pillow>=10.0
+
+# Skydio Cloud API client (optional path)
+requests>=2.31
+
+# Test fixtures: generate sample barcodes/QRs offline
+python-barcode>=0.15
+qrcode[pil]>=7.4

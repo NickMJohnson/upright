@@ -88,6 +88,7 @@ the same Wi-Fi). Full steps, flying tips, and demo script:
 
 | Doc | What it covers |
 |---|---|
+| [docs/TEST-WALKTHROUGH.md](docs/TEST-WALKTHROUGH.md) | **No-drone webcam test: placement, commands, expected output** |
 | [docs/DEMO-RTMP.md](docs/DEMO-RTMP.md) | Current demo runbook (Mini 4 Pro → RTMP → live decode) |
 | [docs/PLAN.md](docs/PLAN.md) | Roadmap + platform decision log |
 | [docs/BOM-vision-demo.md](docs/BOM-vision-demo.md) | QAV250 autonomous build parts list (~$1.1–1.3k) |

@@ -52,6 +52,13 @@ Notes:
 - Controllers: with the RC-N2, DJI Fly runs on your phone (phone's Wi-Fi
   carries the stream). With the DJI RC 2, DJI Fly runs on the controller —
   join IT to the Wi-Fi via its own settings.
+- **Audio-only stream / decoder can't open the URL:** if the mediamtx log says
+  `1 track (MPEG-4 Audio)` when DJI Fly connects, the drone is encoding
+  **H.265/HEVC** (Mini 4 Pro default) and the video track is being dropped.
+  Fix in DJI Fly: camera settings → **Video Coding → H.264**, then restart the
+  stream. Healthy log line shows **2 tracks** (H264 + audio).
+- Start order doesn't matter: the decoder waits for the publisher and
+  reconnects after drops.
 - Unique reads print to the console and append to `results/stream.jsonl`
   (with UTC timestamps); the preview window draws green boxes on decodes.
 - Headless/logging-only: add `--no-display`. Tune `--stride N` if CPU-bound.

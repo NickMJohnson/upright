@@ -83,8 +83,22 @@ def _run_live(
 
     cap = cv2.VideoCapture(src)
     if not cap.isOpened():
-        print(f"Could not open video source: {src}", file=sys.stderr)
-        return 1
+        if not reconnect:
+            print(f"Could not open video source: {src}", file=sys.stderr)
+            return 1
+        # A live URL with no publisher yet (or an audio-only stream) fails to
+        # open — wait and retry so decoder/publisher start order doesn't matter.
+        print(f"Stream not available yet at {src} — waiting for the publisher "
+              "(Ctrl-C to stop)...")
+        try:
+            while not cap.isOpened():
+                cap.release()
+                time.sleep(2)
+                cap = cv2.VideoCapture(src)
+        except KeyboardInterrupt:
+            print("\nStopped while waiting for the stream.")
+            return 1
+        print("Stream is up — decoding.")
     RESULTS.mkdir(exist_ok=True)
     log_path = RESULTS / log_name
     print(f"Reading {src} — logging to {log_path}. "

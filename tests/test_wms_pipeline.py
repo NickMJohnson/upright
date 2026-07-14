@@ -35,6 +35,8 @@ STREAM = [
     {"data": "TOOL-777", "symbology": "CODE128", "ts": "2026-07-14T10:01:03+00:00", "source": "s#4"},
     {"data": "4006381333931", "symbology": "EAN13", "ts": "2026-07-14T10:01:05+00:00", "source": "s#5"},
     {"data": 4006381333931, "symbology": "EAN13", "ts": "2026-07-14T10:01:06+00:00", "source": "s#5b"},
+    # a one-off corrupted read (phantom) — the sightings threshold must catch it
+    {"data": "PHANT0M-1", "symbology": "CODE128", "ts": "2026-07-14T10:01:07+00:00", "source": "s#5c"},
     # bay 3: placard seen in transit, NO item reads -> must never yield 'missing'
     {"data": "LOC:A08-B01-L1", "symbology": "QRCODE", "ts": "2026-07-14T10:02:00+00:00", "source": "s#6"},
     # a known item read far outside any placard window -> no location context
@@ -65,16 +67,16 @@ def test_pipeline() -> None:
 
     conn = connect(tmp / "scans.db")
     summary = ingest_jsonl(conn, jsonl, mission_id="m1")
-    assert summary["inserted"] == 8, summary
+    assert summary["inserted"] == 9, summary
     assert summary["placards"] == 3, summary
-    assert summary["location_tagged"] == 4, summary  # STALE-1 outside 10s window
+    assert summary["location_tagged"] == 5, summary  # STALE-1 outside 10s window
 
     # idempotency: replay changes nothing
     again = ingest_jsonl(conn, jsonl, mission_id="m1")
-    assert again["inserted"] == 0 and again["skipped_duplicates"] == 8, again
+    assert again["inserted"] == 0 and again["skipped_duplicates"] == 9, again
 
     obs = observations(conn, "m1")
-    assert len(obs) == 4, obs  # SKU, TOOL, EAN, STALE (placards excluded)
+    assert len(obs) == 5, obs  # SKU, TOOL, EAN, PHANT0M, STALE (placards excluded)
     ean = next(o for o in obs if o["barcode"] == "4006381333931")
     assert ean["sightings"] == 2 and ean["location"] == "A07-B13-L1", ean
 
@@ -93,8 +95,24 @@ def test_pipeline() -> None:
         "missing": 2,      # WIDGET-999 and STALE-1: bay visited, not seen there
         "unverified": 3,   # GADGET-1, TOOL-777's expected bay, EMPTY-BAY-ITEM
         "misplaced": 1,    # TOOL-777 seen at A07-B13-L1
-        "unexpected": 1,   # EAN at bay 2 (STALE-1 is known -> evidence, not verdict)
+        "unexpected": 2,   # EAN + PHANT0M-1 at bay 2 (threshold off by default)
     }, counts
+
+    # With min_sightings=2: one-sighting accusations (the phantom AND the
+    # single-read TOOL-777 misplaced claim) downgrade to low_confidence; the
+    # 2-sighting EAN survives; matches are never gated by the threshold.
+    strict = reconcile(adapter.fetch_expected(), obs, visited,
+                       placard_seen=placards, min_sightings=2)
+    strict_counts = summarize(strict)
+    phantom = next(v for v in strict if v.barcode == "PHANT0M-1")
+    assert phantom.verdict == "low_confidence", phantom
+    assert "1 sighting" in phantom.note, phantom
+    ean_v = next(v for v in strict if v.barcode == "4006381333931")
+    assert ean_v.verdict == "unexpected" and ean_v.sightings == 2, ean_v
+    assert strict_counts == {
+        "match": 1, "missing": 2, "unverified": 3,
+        "unexpected": 1, "low_confidence": 2,
+    }, strict_counts
 
     # missing STALE-1 must carry its no-context sighting as evidence
     stale = next(v for v in _by_verdict(verdicts, "missing") if v.barcode == "STALE-1")

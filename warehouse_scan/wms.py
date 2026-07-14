@@ -78,6 +78,9 @@ class FileExchangeAdapter:
         return self._write("cycle_counts.csv", verdicts)
 
     def push_exceptions(self, verdicts: list["Verdict"]) -> Path:
+        # low_confidence rows stay in cycle_counts.csv (audit trail) but are
+        # kept out of the supervisor-facing exceptions report.
         return self._write(
-            "exceptions.csv", [v for v in verdicts if v.verdict != "match"]
+            "exceptions.csv",
+            [v for v in verdicts if v.verdict not in ("match", "low_confidence")],
         )

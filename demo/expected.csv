@@ -1,0 +1,6 @@
+location,barcode,description
+A07-B12-L3,SKU-000123-A,widget case - you WILL show this (match)
+A07-B12-L3,WIDGET-999,ghost item - you will NOT show it (missing)
+A07-B14-L2,TOOL-777,expected at B14 but you show it at B13 (misplaced)
+A08-B01-L1,FREEZER-KIT,placard-only bay (unverified - placard seen)
+A09-B01-L1,GADGET-1,bay you never visit (unverified - not visited)

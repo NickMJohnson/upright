@@ -12,6 +12,15 @@ Verdicts:
   unexpected  observed item that appears nowhere in the expected snapshot
   unverified  expected location never item-scanned — no claim made (a placard
               glimpse alone does not count as visiting; see visited_locations)
+  low_confidence  observation below the sightings threshold — kept in the
+              cycle-count audit trail but excluded from the exceptions report.
+              Corrupted reads that beat a barcode checksum (common off phone
+              screens, rare off paper) appear once; real labels re-read
+              consistently, so `min_sightings=2` filters phantoms cheaply.
+
+The threshold only gates accusations (misplaced/unexpected). Matches count at
+any sighting level — filtering observations out of matching could fabricate
+false `missing` claims.
 """
 
 from __future__ import annotations
@@ -35,6 +44,7 @@ def reconcile(
     observations: list[dict],
     visited: set[str],
     placard_seen: set[str] | None = None,
+    min_sightings: int = 1,
 ) -> list[Verdict]:
     """expected: [{location, barcode, ...}]; observations: from ingest.observations().
 
@@ -42,6 +52,8 @@ def reconcile(
     placard_seen: locations whose placard was decoded (ingest.placard_locations) —
     used only to annotate `unverified` rows; a placard glimpse alone never
     enables a `missing` claim.
+    min_sightings: observations seen fewer times than this are downgraded to
+    `low_confidence` instead of generating misplaced/unexpected claims.
     """
     placard_seen = placard_seen or set()
     exp_locs: dict[str, set[str]] = defaultdict(set)
@@ -87,23 +99,31 @@ def reconcile(
     # Observed side: misplaced (known item, wrong place) / unexpected (unknown item).
     # Known barcodes read without location context are surfaced via the
     # expected-side evidence notes above, not as separate verdicts.
+    def _accuse(kind: str, bc: str, loc: str | None, exp: str | None, o: dict,
+                note: str = "") -> Verdict:
+        if o["sightings"] < min_sightings:
+            detail = f"would be '{kind}' but only {o['sightings']} sighting(s)"
+            return Verdict("low_confidence", bc, loc, exp, o["sightings"],
+                           f"{detail}; {note}" if note else detail)
+        return Verdict(kind, bc, loc, exp, o["sightings"], note)
+
     for o in observations:
         bc, loc = o["barcode"], o["location"]
         if loc is None:
             if bc not in exp_locs:
                 verdicts.append(
-                    Verdict("unexpected", bc, None, None, o["sightings"],
+                    _accuse("unexpected", bc, None, None, o,
                             "no location context for this read")
                 )
             continue
         if bc in exp_locs:
             if loc not in exp_locs[bc]:
                 verdicts.append(
-                    Verdict("misplaced", bc, loc,
-                            ", ".join(sorted(exp_locs[bc])), o["sightings"])
+                    _accuse("misplaced", bc, loc,
+                            ", ".join(sorted(exp_locs[bc])), o)
                 )
         else:
-            verdicts.append(Verdict("unexpected", bc, loc, None, o["sightings"]))
+            verdicts.append(_accuse("unexpected", bc, loc, None, o))
 
     return verdicts
 

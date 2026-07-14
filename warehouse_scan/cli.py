@@ -167,7 +167,8 @@ def _run_ingest(paths: list[str], db: str, mission: str, window: float) -> int:
     return 0
 
 
-def _run_reconcile(expected_csv: str, db: str, mission: str, out_dir: str) -> int:
+def _run_reconcile(expected_csv: str, db: str, mission: str, out_dir: str,
+                   min_sightings: int = 1) -> int:
     from pathlib import Path as _Path
 
     from .ingest import connect, observations, placard_locations, visited_locations
@@ -187,15 +188,19 @@ def _run_reconcile(expected_csv: str, db: str, mission: str, out_dir: str) -> in
         placards = placard_locations(conn, mission)
     finally:
         conn.close()
-    verdicts = reconcile(expected, obs, visited, placard_seen=placards)
+    verdicts = reconcile(expected, obs, visited, placard_seen=placards,
+                         min_sightings=min_sightings)
     counts = summarize(verdicts)
     counts_path = adapter.push_counts(verdicts)
     exceptions_path = adapter.push_exceptions(verdicts)
 
     print(f"Expected rows: {len(expected)}, observations: {len(obs)}, "
-          f"visited locations: {len(visited)}")
+          f"visited locations: {len(visited)}, min sightings: {min_sightings}")
     for verdict in ("match", "missing", "misplaced", "unexpected", "unverified"):
         print(f"  {verdict:<11} {counts.get(verdict, 0)}")
+    if counts.get("low_confidence"):
+        print(f"  low_confidence {counts['low_confidence']} "
+              "(below sightings threshold; in cycle_counts.csv, not exceptions.csv)")
     print(f"\nCycle counts -> {counts_path}\nExceptions  -> {exceptions_path}")
     return 0
 
@@ -244,6 +249,10 @@ def main(argv: list[str] | None = None) -> int:
     p_rec.add_argument("--db", default="results/scans.db")
     p_rec.add_argument("--mission", default="default")
     p_rec.add_argument("--out", default="results")
+    p_rec.add_argument("--min-sightings", type=int, default=1,
+                       help="observations seen fewer times than this become "
+                            "low_confidence instead of misplaced/unexpected "
+                            "claims (default 1 = off; 2 filters one-off misreads)")
 
     args = parser.parse_args(argv)
 
@@ -268,7 +277,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "ingest":
         return _run_ingest(args.paths, args.db, args.mission, args.window)
     if args.cmd == "reconcile":
-        return _run_reconcile(args.expected, args.db, args.mission, args.out)
+        return _run_reconcile(args.expected, args.db, args.mission, args.out,
+                              min_sightings=args.min_sightings)
     return 2
 
 

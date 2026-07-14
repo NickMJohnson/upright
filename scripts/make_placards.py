@@ -20,11 +20,10 @@ import sys
 from pathlib import Path
 
 import qrcode
-from PIL import Image, ImageDraw, ImageFont
+from caption_util import add_caption
 
 OUT = Path("placards")
 QR_MODULE_PX = 24  # big modules -> long-range readability
-CAPTION_H = 140
 
 
 def make_placard(code: str) -> Path:
@@ -35,22 +34,10 @@ def make_placard(code: str) -> Path:
     )
     qr.add_data(f"LOC:{code}")
     qr.make(fit=True)
-    img = qr.make_image(fill_color="black", back_color="white").convert("RGB")
-
-    w, h = img.size
-    canvas = Image.new("RGB", (w, h + CAPTION_H), "white")
-    canvas.paste(img, (0, 0))
-    draw = ImageDraw.Draw(canvas)
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 96)
-    except OSError:
-        try:
-            font = ImageFont.load_default(size=96)  # Pillow >= 10.1
-        except TypeError:
-            font = ImageFont.load_default()
-    bbox = draw.textbbox((0, 0), code, font=font)
-    draw.text(((w - (bbox[2] - bbox[0])) / 2, h + (CAPTION_H - (bbox[3] - bbox[1])) / 2 - bbox[1]),
-              code, fill="black", font=font)
+    img = qr.make_image(fill_color="black", back_color="white")
+    canvas = add_caption(
+        img.get_image() if hasattr(img, "get_image") else img, code, font_px=96
+    )
 
     OUT.mkdir(exist_ok=True)
     safe = re.sub(r"[^A-Za-z0-9._-]", "_", code)  # codes may contain '/' etc.

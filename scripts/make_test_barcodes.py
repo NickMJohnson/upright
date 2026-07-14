@@ -30,9 +30,11 @@ def make_ean13(value: str, name: str) -> None:
 
 def make_qr(value: str, name: str) -> None:
     import qrcode
+    from caption_util import add_caption
 
     img = qrcode.make(value)
-    img.save(str(OUT / f"{name}.png"))
+    add_caption(img.get_image() if hasattr(img, "get_image") else img,
+                value).save(str(OUT / f"{name}.png"))
 
 
 if __name__ == "__main__":

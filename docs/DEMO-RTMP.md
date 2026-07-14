@@ -36,8 +36,22 @@ ipconfig getifaddr en0           # e.g. 192.168.1.42
 python -m warehouse_scan stream rtmp://localhost:1935/live/drone
 ```
 
+Verify the drone side is publishing: when DJI Fly starts streaming, the
+mediamtx terminal must print `[RTMP] [conn ...] is publishing to path
+'live/drone'`. No line = the stream never reached the laptop (see network
+notes below).
+
 Notes:
-- macOS may prompt to allow mediamtx to accept incoming connections — allow it.
+- macOS may prompt to allow mediamtx to accept incoming connections — allow it
+  (denying this is the most common silent failure).
+- **Client isolation:** many office/warehouse Wi-Fi networks block
+  device-to-device traffic. Quick test: browse to `http://<laptop-ip>:8888`
+  from the phone — a timeout means isolation. Fallback: create a Personal
+  Hotspot on the phone, join the LAPTOP to it, and re-run
+  `ipconfig getifaddr en0` (the laptop's IP changes on the hotspot).
+- Controllers: with the RC-N2, DJI Fly runs on your phone (phone's Wi-Fi
+  carries the stream). With the DJI RC 2, DJI Fly runs on the controller —
+  join IT to the Wi-Fi via its own settings.
 - Unique reads print to the console and append to `results/stream.jsonl`
   (with UTC timestamps); the preview window draws green boxes on decodes.
 - Headless/logging-only: add `--no-display`. Tune `--stride N` if CPU-bound.

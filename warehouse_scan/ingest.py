@@ -142,6 +142,19 @@ def ingest_jsonl(
     }
 
 
+def missions(conn: sqlite3.Connection) -> list[dict]:
+    """All missions in the store: name, scan/placard counts, time range."""
+    rows = conn.execute(
+        "SELECT mission_id, COUNT(*), SUM(is_placard), MIN(ts), MAX(ts) "
+        "FROM scans GROUP BY mission_id ORDER BY MAX(ts) DESC"
+    ).fetchall()
+    return [
+        {"mission_id": m, "scans": n, "placards": p or 0,
+         "first_ts": t0, "last_ts": t1}
+        for m, n, p, t0, t1 in rows
+    ]
+
+
 def clear_mission(conn: sqlite3.Connection, mission_id: str) -> int:
     """Delete all scans for a mission (for re-running a test under the same
     name). Returns the number of rows removed. Missions are point-in-time

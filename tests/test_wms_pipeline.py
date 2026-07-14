@@ -86,6 +86,11 @@ def test_pipeline() -> None:
     redo = ingest_jsonl(conn, jsonl, mission_id="m1")
     assert redo["inserted"] == 10, redo
 
+    from warehouse_scan.ingest import missions
+    assert {m["mission_id"] for m in missions(conn)} == {"m1", "other"}
+    m1 = next(m for m in missions(conn) if m["mission_id"] == "m1")
+    assert m1["scans"] == 10 and m1["placards"] == 3, m1
+
     obs = observations(conn, "m1")
     assert len(obs) == 6, obs  # SKU, TOOL, EAN, PHANT0M, QR-ONLY, STALE
     ean = next(o for o in obs if o["barcode"] == "4006381333931")

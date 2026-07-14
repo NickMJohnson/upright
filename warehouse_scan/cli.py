@@ -173,6 +173,29 @@ def _run_ingest(paths: list[str], db: str, mission: str, window: float,
     return 0
 
 
+def _run_missions(db: str) -> int:
+    from pathlib import Path as _Path
+
+    from .ingest import connect, missions
+
+    if not _Path(db).exists():
+        print(f"Scan store not found: {db}", file=sys.stderr)
+        return 1
+    conn = connect(db)
+    try:
+        rows = missions(conn)
+    finally:
+        conn.close()
+    if not rows:
+        print("No missions in the store yet.")
+        return 0
+    print(f"{'mission':<28} {'scans':>6} {'placards':>9}  time range (UTC)")
+    for r in rows:
+        span = f"{(r['first_ts'] or '?')[:19]} .. {(r['last_ts'] or '?')[:19]}"
+        print(f"{r['mission_id']:<28} {r['scans']:>6} {r['placards']:>9}  {span}")
+    return 0
+
+
 def _run_reconcile(expected_csv: str, db: str, mission: str, out_dir: str,
                    min_sightings: int = 1) -> int:
     from pathlib import Path as _Path
@@ -257,6 +280,9 @@ def main(argv: list[str] | None = None) -> int:
                        help="clear any prior scans for this mission first — use "
                             "when re-running a test under the same mission name")
 
+    p_mis = sub.add_parser("missions", help="list missions in the scan store")
+    p_mis.add_argument("--db", default="results/scans.db")
+
     p_rec = sub.add_parser("reconcile",
                            help="compare scan store vs expected inventory CSV")
     p_rec.add_argument("--expected", required=True,
@@ -293,6 +319,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "ingest":
         return _run_ingest(args.paths, args.db, args.mission, args.window,
                            fresh=args.fresh)
+    if args.cmd == "missions":
+        return _run_missions(args.db)
     if args.cmd == "reconcile":
         return _run_reconcile(args.expected, args.db, args.mission, args.out,
                               min_sightings=args.min_sightings)

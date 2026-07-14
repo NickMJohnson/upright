@@ -1,7 +1,7 @@
 """Warehouse inventory barcode-scanning toolkit.
 
-Drone-agnostic perception pipeline (decode 1D/2D barcodes from imagery) plus a
-client stub for pulling captured media from the Skydio Cloud API.
+Drone-agnostic perception pipeline: decode 1D/2D barcodes from images, video,
+webcams, or live RTMP/RTSP drone streams.
 """
 
 from .detector import Detection, decode_frame, dedupe

@@ -159,6 +159,44 @@ Reading the three `unverified` notes is the point of the design:
 - **Same walk, new mission:** re-walk and ingest with `--mission test2` —
   missions are isolated; reconcile each independently.
 
-When the DJI Mini 4 Pro arrives, this exact test moves onto the drone by
-replacing step 1 with `python -m warehouse_scan stream rtmp://localhost:1935/live/drone`
-(see [DEMO-RTMP.md](DEMO-RTMP.md)) — everything from ingest onward is identical.
+## 8. The same test with the drone (DJI Mini 4 Pro)
+
+Only the capture step changes — ingest, reconcile, and `demo/expected.csv` are
+identical. (`expected.csv` plays the WMS: in production it's replaced by a real
+WMS inventory export with the same `location,barcode` columns.)
+
+**Physical prep:**
+- Print the **placards at 15×15 cm minimum** (A4 is better), paper not screens,
+  mounted at rack positions a few meters apart.
+- Print the **item labels as large QRs** (~10 cm) and tape them near their
+  placards, same layout as §3: bay 1 = SKU, bay 2 = TOOL + EAN, bay 3 = placard
+  only.
+- Open area / wide aisle, slow flight, safety pilot — see [DEMO-RTMP.md](DEMO-RTMP.md).
+
+**Software prep (laptop):**
+```bash
+mediamtx config/mediamtx.yml                    # terminal 1
+rm -f results/stream.jsonl
+python -m warehouse_scan stream rtmp://localhost:1935/live/drone --relog-interval 1   # terminal 2
+```
+DJI Fly (phone on the same Wi-Fi) → Live Streaming → RTMP →
+`rtmp://<laptop-ip>:1935/live/drone`, quality 1080p.
+
+**Ground check:** before takeoff, hold a printed QR in front of the gimbal and
+confirm it prints in the terminal — validates the whole chain props-off.
+
+**Flight = the §3 walk script, airborne.** At each bay: hover facing the
+placard **until the terminal prints it** (stream latency is 2–5 s — trust the
+terminal, not your eyes), then slide to the item labels and hover at each until
+printed. Start ~1.5–2 m from labels, creep closer if reads don't come; same
+¼-of-frame rule.
+
+**After landing:**
+```bash
+python -m warehouse_scan ingest results/stream.jsonl --mission flight1 --window 30
+python -m warehouse_scan reconcile --expected demo/expected.csv --mission flight1 --min-sightings 2
+```
+
+**Success criterion:** the identical six-row exceptions.csv from §5. Webcam run
+vs flight producing the same report from the same layout proves the drone adds
+no data-quality regression.

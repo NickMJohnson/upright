@@ -210,6 +210,27 @@ def _run_missions(db: str) -> int:
     return 0
 
 
+def _run_clean(include_db: bool) -> int:
+    names = ["scan.jsonl", "stream.jsonl", "webcam.jsonl",
+             "cycle_counts.csv", "exceptions.csv", "benchmark.json"]
+    if include_db:
+        names.append("scans.db")
+    removed = []
+    for name in names:
+        p = RESULTS / name
+        if p.exists():
+            p.unlink()
+            removed.append(name)
+    if removed:
+        print("Removed: " + ", ".join(removed))
+    else:
+        print("Nothing to remove — results/ is already clean.")
+    if not include_db and (RESULTS / "scans.db").exists():
+        print("Kept scans.db (past missions). Use --all to remove it too, "
+              "or `missions` / `ingest --fresh` for per-mission cleanup.")
+    return 0
+
+
 def _run_reconcile(expected_csv: str, db: str, mission: str, out_dir: str,
                    min_sightings: int = 1) -> int:
     from pathlib import Path as _Path
@@ -309,6 +330,11 @@ def main(argv: list[str] | None = None) -> int:
                             "low_confidence instead of misplaced/unexpected "
                             "claims (default 1 = off; 2 filters one-off misreads)")
 
+    p_clean = sub.add_parser("clean",
+                             help="delete generated test outputs in results/")
+    p_clean.add_argument("--all", action="store_true",
+                         help="also delete the scan store (scans.db) with all missions")
+
     args = parser.parse_args(argv)
 
     if args.cmd == "image":
@@ -338,6 +364,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.cmd == "reconcile":
         return _run_reconcile(args.expected, args.db, args.mission, args.out,
                               min_sightings=args.min_sightings)
+    if args.cmd == "clean":
+        return _run_clean(include_db=args.all)
     return 2
 
 

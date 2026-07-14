@@ -142,6 +142,16 @@ def ingest_jsonl(
     }
 
 
+def clear_mission(conn: sqlite3.Connection, mission_id: str) -> int:
+    """Delete all scans for a mission (for re-running a test under the same
+    name). Returns the number of rows removed. Missions are point-in-time
+    snapshots — re-ingesting a new session into an old mission silently blends
+    evidence across runs (inflated sightings, stale matches/visits)."""
+    cur = conn.execute("DELETE FROM scans WHERE mission_id = ?", (mission_id,))
+    conn.commit()
+    return cur.rowcount
+
+
 def observations(conn: sqlite3.Connection, mission_id: str | None = None) -> list[dict]:
     """Deduped inventory observations: one row per (barcode, location)."""
     where = "WHERE is_placard = 0"

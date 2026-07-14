@@ -77,6 +77,15 @@ def test_pipeline() -> None:
     again = ingest_jsonl(conn, jsonl, mission_id="m1")
     assert again["inserted"] == 0 and again["skipped_duplicates"] == 10, again
 
+    # clear_mission wipes only the named mission, enabling clean re-runs
+    from warehouse_scan.ingest import clear_mission
+    ingest_jsonl(conn, jsonl, mission_id="other")
+    assert clear_mission(conn, "m1") == 10
+    assert observations(conn, "m1") == []
+    assert len(observations(conn, "other")) == 6  # untouched
+    redo = ingest_jsonl(conn, jsonl, mission_id="m1")
+    assert redo["inserted"] == 10, redo
+
     obs = observations(conn, "m1")
     assert len(obs) == 6, obs  # SKU, TOOL, EAN, PHANT0M, QR-ONLY, STALE
     ean = next(o for o in obs if o["barcode"] == "4006381333931")

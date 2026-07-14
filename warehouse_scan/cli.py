@@ -153,11 +153,15 @@ def _run_stream(url: str, display: bool = True, stride: int = 3,
                      reconnect=True, relog_s=relog_s)
 
 
-def _run_ingest(paths: list[str], db: str, mission: str, window: float) -> int:
-    from .ingest import connect, ingest_jsonl, observations
+def _run_ingest(paths: list[str], db: str, mission: str, window: float,
+                fresh: bool = False) -> int:
+    from .ingest import clear_mission, connect, ingest_jsonl, observations
 
     conn = connect(db)
     try:
+        if fresh:
+            removed = clear_mission(conn, mission)
+            print(f"--fresh: cleared {removed} prior scan(s) from mission '{mission}'")
         for p in paths:
             summary = ingest_jsonl(conn, p, mission_id=mission, placard_window_s=window)
             print(f"{p}: " + ", ".join(f"{k}={v}" for k, v in summary.items()))
@@ -249,6 +253,9 @@ def main(argv: list[str] | None = None) -> int:
     p_ing.add_argument("--mission", default="default")
     p_ing.add_argument("--window", type=float, default=10.0,
                        help="placard location context window, seconds (default 10)")
+    p_ing.add_argument("--fresh", action="store_true",
+                       help="clear any prior scans for this mission first — use "
+                            "when re-running a test under the same mission name")
 
     p_rec = sub.add_parser("reconcile",
                            help="compare scan store vs expected inventory CSV")
@@ -284,7 +291,8 @@ def main(argv: list[str] | None = None) -> int:
         from .benchmark import main_benchmark
         return main_benchmark(args.path, trials=args.trials)
     if args.cmd == "ingest":
-        return _run_ingest(args.paths, args.db, args.mission, args.window)
+        return _run_ingest(args.paths, args.db, args.mission, args.window,
+                           fresh=args.fresh)
     if args.cmd == "reconcile":
         return _run_reconcile(args.expected, args.db, args.mission, args.out,
                               min_sightings=args.min_sightings)

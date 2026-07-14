@@ -81,8 +81,12 @@ rm -f results/webcam.jsonl
 # 1. the walk — press q in the preview window when done
 python -m warehouse_scan webcam --relog-interval 1
 
-# 2. raw reads -> located observations (pick a fresh mission name per run)
-python -m warehouse_scan ingest results/webcam.jsonl --mission test1 --window 30
+# 2. raw reads -> located observations
+#    Missions are point-in-time buckets: either use a NEW mission name per run,
+#    or reuse one WITH --fresh (clears that mission's prior scans first).
+#    Reusing a name without --fresh blends runs: inflated sightings, stale
+#    matches, and locations "visited" by earlier sessions.
+python -m warehouse_scan ingest results/webcam.jsonl --mission test1 --window 30 --fresh
 
 # 3. observations vs expected inventory -> verdicts + reports
 python -m warehouse_scan reconcile --expected demo/expected.csv \

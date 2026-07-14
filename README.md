@@ -1,62 +1,36 @@
-# Upright — Autonomous Warehouse Inventory Scanning
+# Upright — Warehouse Inventory Scanning by Drone
 
-Goal: autonomously fly a drone through a warehouse and read inventory barcodes,
-matching them to rack/aisle locations.
+Scan warehouse inventory barcodes from a drone and reconcile the results against
+the warehouse management system.
 
-## ⚠️ Read this first: the Skydio R1 reality check
+## Current direction
 
-You asked to use the **Skydio R1** and "find/set up its SDK." After researching
-the current (2026) state of things, here is the honest situation:
+**Phase A (now): piloted demo.** A human-flown **DJI Mini 4 Pro** live-streams
+video (DJI Fly → RTMP over Wi-Fi) to a laptop, which decodes barcodes in real
+time and logs `{barcode, timestamp}` records. The laptop pipeline is built and
+verified end-to-end against a simulated 1080p drone feed.
+→ Runbook: **[docs/DEMO-RTMP.md](docs/DEMO-RTMP.md)**
 
-- The **Skydio R1 is a discontinued 2018 consumer drone.** Its Python
-  **"Skills SDK"** (the thing that let you write custom onboard autonomy/perception)
-  was **invite-only even when new**, and there is **no supported, installable R1
-  SDK today**. Skydio's GitHub org now ships only
-  [`skydio-cloud-api-examples`](https://github.com/Skydio/skydio-cloud-api-examples);
-  the old skills code only survives as stale community forks. So **there is no
-  "R1 SDK" to set up.**
-- Skydio's **current** developer surface ("Skydio Extend") targets the
-  **enterprise X10 / X10D**, not the R1:
-  - **Cloud API** — public, JWT REST/JSON ([apidocs.skydio.com](https://apidocs.skydio.com)):
-    plan/launch missions, pull telemetry, live RTSP video, and **download captured
-    media**. *Not* low-level real-time control, *not* custom onboard perception.
-  - **Control & Telemetry ICD** (MAVLink / RAS-A) — real-time command & control,
-    **X10D only**, access-gated (defense/partner).
-  - There is **no public way to run a custom onboard "barcode skill"** on current
-    Skydio hardware like the R1 once allowed.
-- **Barcode-from-a-drone is real but specialized.** Companies like
-  **Corvus Robotics** (Corvus One: 12 nav cameras + an *industrial* barcode scanner,
-  flies lights-out, no beacons), **Gather AI**, and **Verity** sell this as a
-  managed **Robot-as-a-Service**. The hard part is **not** decoding the barcode —
-  it's **GPS-denied indoor autonomy**, safe flight in cluttered racking, and
-  barcode **optics/lighting** at standoff distance.
+**Phase B: autonomous platform.** A PX4-based QAV250 build (optical flow +
+downward LiDAR for GPS/beacon-free indoor positioning, Raspberry Pi 5 companion,
+global-shutter camera for onboard decode) flies scripted aisle missions.
+→ Parts list: **[docs/BOM-vision-demo.md](docs/BOM-vision-demo.md)** ·
+background: **[docs/BUILD.md](docs/BUILD.md)**
 
-**Bottom line:** the R1 is the wrong starting point. See [docs/PLAN.md](docs/PLAN.md)
-for the three realistic paths (buy turnkey / build DIY / Skydio-enterprise) and a
-recommendation. For the **DIY build decision** — DJI+Marvelmind vs. building your
-own, with parts lists, prices, and a step-by-step — see [docs/BUILD.md](docs/BUILD.md).
-Bills of materials: [PX4 + Marvelmind](docs/BOM-px4-marvelmind.md) ·
-[PX4 + VIO, no beacons](docs/BOM-px4-vio.md) ·
-[**vision-only $2k demo drone**](docs/BOM-vision-demo.md) (chosen for the initial demo).
-WMS integration plan: [docs/WMS-INTEGRATION.md](docs/WMS-INTEGRATION.md).
-**Current demo (human-piloted DJI Mini 4 Pro → RTMP → live laptop decode):
-[docs/DEMO-RTMP.md](docs/DEMO-RTMP.md).**
+**Phase C: WMS integration.** Scan records become a cycle-count feed — ingest,
+dedupe, reconcile against expected stock, and push counts/exceptions to the WMS.
+→ Plan: **[docs/WMS-INTEGRATION.md](docs/WMS-INTEGRATION.md)**
 
-## What this repo gives you *today*
-
-The one part that is real software work and is **useful no matter which drone you
-land on** is the **barcode/QR perception pipeline**. This repo sets that up so you
-can prove it on a webcam or video right now, plus a stub for the realistic Skydio
-path (fly missions → pull media via Cloud API → decode off-board).
+## What's in this repo
 
 ```
 warehouse_scan/
-  detector.py      # core: decode 1D/2D barcodes from images/video/webcam frames
-  cli.py           # `python -m warehouse_scan ...` entry point
-  skydio_cloud.py  # Skydio Cloud API client stub (list flights, download media)
-scripts/
-  make_test_barcodes.py   # generate sample barcodes to test the pipeline offline
-docs/PLAN.md       # the full plan + path comparison
+  detector.py    # core: decode 1D/2D barcodes in frames (pyzbar + OpenCV)
+  benchmark.py   # read-rate vs distance/angle/blur/lighting harness
+  cli.py         # image | dir | video | webcam | stream | benchmark
+config/mediamtx.yml        # RTMP server config for the live demo
+scripts/make_test_barcodes.py   # generate sample codes (no hardware needed)
+docs/                      # runbook, BOMs, build guide, WMS plan
 ```
 
 ## Quick start
@@ -70,25 +44,37 @@ python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# 3. Prove the perception pipeline works (no hardware needed):
-python scripts/make_test_barcodes.py          # writes sample_data/*.png
-python -m warehouse_scan dir sample_data       # decodes them
+# 3. Prove the pipeline (no hardware needed):
+python scripts/make_test_barcodes.py
+python -m warehouse_scan dir sample_data
 
-# 4. Live test with your laptop webcam (press q to quit):
+# 4. Live webcam test (press q to quit):
 python -m warehouse_scan webcam
 
-# 5. (DIY build, Phase 1) Measure read-rate vs drone-flight conditions:
+# 5. Measure read-rate vs drone-flight conditions on YOUR labels:
 python -m warehouse_scan benchmark sample_data
-#   -> derives the camera resolution / flight-speed / lighting your build needs.
-#      Best run on photos of YOUR real labels, not just the synthetic samples.
 ```
 
-## Skydio Cloud path (only if you go enterprise)
+## Live drone demo (DJI Mini 4 Pro)
 
-`warehouse_scan/skydio_cloud.py` is a thin client for the **public** Cloud API.
-It needs an enterprise org token (set `SKYDIO_API_TOKEN` / `SKYDIO_API_TOKEN_ID`,
-see [.env.example](.env.example)). It can list flights and download captured media
-so you can run `detector.py` over the imagery. This is the *only* Skydio-flavored
-architecture available without the gated real-time ICD.
+```bash
+brew install mediamtx
+mediamtx config/mediamtx.yml                 # terminal 1: RTMP server
+python -m warehouse_scan stream rtmp://localhost:1935/live/drone   # terminal 2
+```
 
-See [docs/PLAN.md](docs/PLAN.md) for the phased roadmap.
+Point DJI Fly's RTMP output at `rtmp://<laptop-ip>:1935/live/drone` (phone on
+the same Wi-Fi). Full steps, flying tips, and demo script:
+[docs/DEMO-RTMP.md](docs/DEMO-RTMP.md).
+
+## Docs index
+
+| Doc | What it covers |
+|---|---|
+| [docs/DEMO-RTMP.md](docs/DEMO-RTMP.md) | Current demo runbook (Mini 4 Pro → RTMP → live decode) |
+| [docs/PLAN.md](docs/PLAN.md) | Roadmap + platform decision log |
+| [docs/BOM-vision-demo.md](docs/BOM-vision-demo.md) | QAV250 autonomous build parts list (~$1.1–1.3k) |
+| [docs/BUILD.md](docs/BUILD.md) | Platform research: DJI vs open autopilot, localization options |
+| [docs/BOM-px4-marvelmind.md](docs/BOM-px4-marvelmind.md) | Beacon-positioning build variant (deferred) |
+| [docs/BOM-px4-vio.md](docs/BOM-px4-vio.md) | VIO production-path BOM (obstacle avoidance included) |
+| [docs/WMS-INTEGRATION.md](docs/WMS-INTEGRATION.md) | WMS integration plan (cycle-count feed model) |

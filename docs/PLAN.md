@@ -1,75 +1,56 @@
-# Plan: autonomous warehouse barcode scanning
+# Roadmap
 
-## 0. The premise check (why not the Skydio R1)
+Goal: autonomous warehouse inventory scanning — drone reads barcodes, results
+reconcile against the WMS. We get there in phases, each one shippable.
 
-| Question | Answer |
-|---|---|
-| Is there an R1 SDK to install? | **No.** The R1 Skills SDK (2018, Python, invite-only) is discontinued; only stale community forks remain. |
-| Is the R1 fit for indoor warehouse barcode scanning? | **No.** It's a discontinued outdoor cinematic drone — not built for GPS-denied aisle flight or close-range barcode optics. |
-| Can current Skydio run a custom onboard "barcode skill"? | **No.** Today's Skydio Extend = Cloud API + (gated) real-time ICD. No public onboard-perception SDK. |
-| Is "fly + read barcodes" feasible at all? | **Yes** — Corvus, Gather AI, Verity ship it. Hard part is autonomy/optics, not decoding. |
+## Phase A — Piloted demo (current)
 
-## 1. Three realistic paths
+Human-flown DJI Mini 4 Pro streams RTMP to a laptop running the live decoder.
+See [DEMO-RTMP.md](DEMO-RTMP.md).
 
-### Path A — Buy a turnkey RaaS system  ✅ recommended for a working warehouse
-- **Vendors:** Corvus Robotics (Corvus One — lights-out, no beacons, industrial
-  barcode scanner, cold-chain variant), Gather AI (commodity drones + AI vision),
-  Verity.
-- **Model:** Robot-as-a-Service subscription. Vendor owns/maintains drones, free
-  hardware/software upgrades, ~1–2 week deployment, integrates with your WMS.
-- **Effort:** procurement + WMS integration. **Not** a drone-software build.
-- **When:** you want inventory accuracy in production, not a research project.
+- [x] Perception pipeline (decode images/video/webcam/stream) — verified
+- [x] RTMP receive path (mediamtx + `stream` CLI) — verified with simulated feed
+- [x] Read-rate benchmark harness (resolution/angle/blur/lighting)
+- [ ] Benchmark on photos of the real warehouse labels
+- [ ] Print location placard QRs for a few bays (location-tagged scans)
+- [ ] Fly the demo: hover at 4–6 labels, show `results/stream.jsonl`
+- [ ] Record 4K onboard; compare stream vs SD-card read-rates
 
-### Path B — Build DIY on an open platform  🔬 if this is R&D / you must own the stack
-- **Flight stack:** PX4 or ArduPilot. **App layer:** ROS 2.
-- **Hardware:**
-  - ModalAI **VOXL 2** — most integrated (autopilot + NVIDIA-class compute + cameras).
-  - Modular: Holybro X500 + Pixhawk + NVIDIA Jetson companion + global-shutter cam.
-  - Crazyflie + Lighthouse — safe, caged early prototyping.
-- **Indoor localization (GPS-denied):** VIO / optical-flow / LiDAR-SLAM; optional
-  UWB or fiducial/aisle markers.
-- **Perception:** **this repo** (pyzbar/ZBar, OpenCV, ZXing, AprilTag).
-- **Sim first:** PX4 SITL + Gazebo before any real flight.
-- **Effort:** serious multi-person robotics R&D. The barcode part is the *easy* 10%.
+**Success:** live decode of real labels in the warehouse, on video, in front of
+stakeholders.
 
-### Path C — Force-fit Skydio enterprise  ⚠️ only if you're committed to Skydio
-- Buy **X10** (enterprise) or **X10D** (defense/Blue UAS, ~$17–21k/unit).
-- Use **3D Scan Indoor Capture** for autonomous GPS-denied missions.
-- Use the **public Cloud API** (`warehouse_scan/skydio_cloud.py`) to pull captured
-  media, then run **this repo's detector** off-board.
-- Limits: no onboard barcode skill; barcode read quality depends on capture
-  resolution/standoff; real-time control needs the gated X10D ICD. Skydio is not
-  optimized for tight-aisle inventory the way Corvus/Gather are.
+## Phase B — WMS integration (software, parallel to anything)
 
-## 2. Phased roadmap (build/prototype track)
+Scan records → ingest → dedupe → reconcile vs expected stock → cycle-count
+feed + exceptions report. Full plan: [WMS-INTEGRATION.md](WMS-INTEGRATION.md).
+Can be piloted with handheld scans before any autonomous flight.
 
-**Phase 1 — Perception on the bench (this repo, days).**
-Prove decode reliability on photos/video of *your actual labels* under warehouse-like
-lighting and distance. Measure read rate vs. distance, angle, motion blur, lighting.
-This de-risks the whole project cheaply. → `python -m warehouse_scan ...`
+## Phase C — Autonomous platform
 
-**Phase 2 — Capture realism (1–2 weeks).**
-Walk the aisles with a phone/gimbal cam (or a tethered drone) recording video at the
-heights/standoffs a drone would fly. Run the detector over it. If read rate is poor,
-you've learned you need closer flight, better optics/lighting, or fiducials — *before*
-buying drones.
+PX4 QAV250 build (~$1.1–1.3k): optical flow + downward LiDAR for GPS/beacon-free
+indoor position-hold, Pi 5 companion running onboard decode, offboard missions
+via ROS 2. Parts: [BOM-vision-demo.md](BOM-vision-demo.md). Research/decisions:
+[BUILD.md](BUILD.md).
 
-**Phase 3 — Localization + mapping (research, weeks–months for Path B).**
-Decide how a code maps to a location: drone pose (VIO/SLAM) + aisle/bay fiducials, or
-QR location tags on racks. Stand up PX4 SITL + Gazebo; fly a sim mission.
+1. PX4 SITL + Gazebo mission scripts (before hardware arrives)
+2. Assemble, flow+LiDAR EKF2 bring-up, caged hover
+3. Scripted aisle pass: hover at labels, decode onboard, placard-tagged records
+4. Feed Phase-B pipeline from the drone instead of the pilot
 
-**Phase 4 — Closed-loop on hardware (Path B/C).**
-Small dev drone in a caged area: autonomous aisle traverse → capture → decode →
-write `{barcode, location, timestamp}` to a store. Then WMS reconciliation.
+## Phase D — Production decision gate
 
-**Phase 5 — WMS integration & ops.**
-Reconcile scans against expected inventory; flag mismatches; schedule recurring
-counts. (Turnkey vendors give you this out of the box — Path A.)
+With demo + autonomy data in hand, decide:
+- **Scale the build:** move to a VIO platform with obstacle avoidance
+  ([BOM-px4-vio.md](BOM-px4-vio.md)) for full-height aisles and lights-out ops.
+- **Or buy:** turnkey RaaS (Corvus Robotics, Gather AI, Verity) if coverage,
+  reliability, and support economics beat building at scale.
 
-## 3. Decision shortcut
-- **Need inventory accuracy in a real warehouse now →** Path A (buy).
-- **Building a product / research, want to own the stack →** Path B (PX4/ROS2/VOXL).
-- **Org is standardized on Skydio →** Path C (X10 + Cloud API + this repo).
+## Platform decision log
 
-In every case, **Phase 1 of this repo is the right first move** — it costs nothing
-and tells you whether your labels are even readable from the air.
+| Date | Decision | Why |
+|---|---|---|
+| 2026-06 | Skydio R1 ruled out | Discontinued; its Skills SDK no longer obtainable; no current Skydio path for custom onboard perception |
+| 2026-06 | DJI + Marvelmind ruled out for autonomy | DJI FC is closed — no external position fusion; SDK virtual-stick control disables obstacle avoidance |
+| 2026-06 | Marvelmind beacons deferred | Ultrasonic line-of-sight + weak Z don't scale to tall racking; PX4 fusion works but VIO/flow is infrastructure-free |
+| 2026-06 | X500 swapped for QAV250 | 500 mm frame too large for aisles; 250 mm runs the identical PX4 stack |
+| 2026-06 | Demo simplified to piloted Mini 4 Pro + RTMP | Proves scanning value now; autonomy proceeds in parallel as Phase C |

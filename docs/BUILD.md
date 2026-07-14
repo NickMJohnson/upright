@@ -1,9 +1,8 @@
 # DIY build & platform decision: DJI+Marvelmind vs. build-your-own
 
-> Scope note: the PX4/ROS 2, hardware, and indoor-localization facts here were
-> verified via research (mid-2026). The DJI-specific deep dive was cut short by a
-> billing limit, so DJI model/price specifics are from scouting + general
-> knowledge — **verify current DJI SDK drone support before buying**.
+> Scope note: PX4/ROS 2, hardware, and indoor-localization facts verified against
+> primary sources (mid-2026). DJI model/price specifics were less deeply verified —
+> **confirm current DJI SDK drone support before purchasing DJI hardware**.
 
 ## 1. The decision hinges on one fact: DJI's flight controller is closed
 

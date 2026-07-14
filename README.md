@@ -38,6 +38,23 @@ tests/test_wms_pipeline.py      # end-to-end: scans -> ingest -> reconcile -> CS
 docs/                      # runbook, BOMs, build guide, WMS plan
 ```
 
+## Test the whole pipeline — no drone needed
+
+Full end-to-end validation using your webcam: you walk "bays" (printed or
+on-screen codes), the pipeline produces the same supervisor report a flight
+would. Complete guide — code placement, walk script, expected output,
+troubleshooting, and the drone variant: **[docs/TEST-WALKTHROUGH.md](docs/TEST-WALKTHROUGH.md)**.
+
+```bash
+python scripts/make_test_barcodes.py                                  # item labels
+python scripts/make_placards.py A07-B12-L3 A07-B13-L1 A08-B01-L1     # bay placards
+rm -f results/webcam.jsonl
+python -m warehouse_scan webcam --relog-interval 1                    # do the walk, press q
+python -m warehouse_scan ingest results/webcam.jsonl --mission test1 --window 30
+python -m warehouse_scan reconcile --expected demo/expected.csv --mission test1 --min-sightings 2
+open results/exceptions.csv                                           # the deliverable
+```
+
 ## From scans to a WMS report
 
 ```bash

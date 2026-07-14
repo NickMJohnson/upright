@@ -171,6 +171,20 @@ def _run_ingest(paths: list[str], db: str, mission: str, window: float,
                 fresh: bool = False) -> int:
     from .ingest import clear_mission, connect, ingest_jsonl, observations
 
+    missing = [p for p in paths if not Path(p).exists()]
+    if missing:
+        for p in missing:
+            print(f"No such file: {p}", file=sys.stderr)
+        existing = sorted(str(f) for f in RESULTS.glob("*.jsonl"))
+        if existing:
+            print(f"Available capture logs: {', '.join(existing)}", file=sys.stderr)
+            print("(webcam -> webcam.jsonl, stream -> stream.jsonl, "
+                  "image/dir/video -> scan.jsonl)", file=sys.stderr)
+        else:
+            print("No capture logs in results/ yet — run a webcam/stream/video "
+                  "session first.", file=sys.stderr)
+        return 1
+
     conn = connect(db)
     try:
         if fresh:

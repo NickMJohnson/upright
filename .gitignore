@@ -8,3 +8,4 @@ media/
 results/
 *.log
 .DS_Store
+placards/

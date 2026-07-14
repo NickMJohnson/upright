@@ -25,6 +25,13 @@ Scan records → ingest → dedupe → reconcile vs expected stock → cycle-cou
 feed + exceptions report. Full plan: [WMS-INTEGRATION.md](WMS-INTEGRATION.md).
 Can be piloted with handheld scans before any autonomous flight.
 
+- [x] Ingest: JSONL → SQLite store with placard location tagging (`ingest.py`)
+- [x] Reconciliation engine, all five verdicts (`reconcile.py`)
+- [x] Tier-1 file-exchange adapter: cycle_counts.csv + exceptions.csv (`wms.py`)
+- [x] Location placard generator (`scripts/make_placards.py`)
+- [ ] Run against a real WMS inventory export (needs: which WMS + real label samples)
+- [ ] Tier-2 API adapter (blocked on WMS choice)
+
 ## Phase C — Autonomous platform
 
 PX4 QAV250 build (~$1.1–1.3k): optical flow + downward LiDAR for GPS/beacon-free

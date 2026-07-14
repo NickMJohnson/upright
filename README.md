@@ -27,11 +27,28 @@ dedupe, reconcile against expected stock, and push counts/exceptions to the WMS.
 warehouse_scan/
   detector.py    # core: decode 1D/2D barcodes in frames (pyzbar + OpenCV)
   benchmark.py   # read-rate vs distance/angle/blur/lighting harness
-  cli.py         # image | dir | video | webcam | stream | benchmark
+  ingest.py      # decoder JSONL -> SQLite scan store (placard location tagging)
+  reconcile.py   # observations vs expected inventory -> verdicts
+  wms.py         # WMS adapter interface + tier-1 CSV file exchange
+  cli.py         # image | dir | video | webcam | stream | benchmark | ingest | reconcile
 config/mediamtx.yml        # RTMP server config for the live demo
 scripts/make_test_barcodes.py   # generate sample codes (no hardware needed)
+scripts/make_placards.py        # printable rack-bay location QR placards
+tests/test_wms_pipeline.py      # end-to-end: scans -> ingest -> reconcile -> CSVs
 docs/                      # runbook, BOMs, build guide, WMS plan
 ```
+
+## From scans to a WMS report
+
+```bash
+# after a flight (or handheld walk-through) produced results/stream.jsonl:
+python -m warehouse_scan ingest results/stream.jsonl --mission aisle07
+python -m warehouse_scan reconcile --expected expected.csv --mission aisle07
+# -> results/cycle_counts.csv + results/exceptions.csv
+```
+
+`expected.csv` is a WMS export with `location,barcode[,description]` columns.
+Rack placards for location tagging: `python scripts/make_placards.py A07-B12-L3 ...`
 
 ## Quick start
 

@@ -1,5 +1,9 @@
 # WMS integration plan — from drone scans to inventory truth
 
+> Status: Phases 1–2 and the tier-1 adapter are implemented — see
+> `warehouse_scan/ingest.py`, `warehouse_scan/reconcile.py`, `warehouse_scan/wms.py`,
+> CLI commands `ingest` / `reconcile`, and `tests/test_wms_pipeline.py`.
+
 Goal: turn raw drone scans into WMS-grade inventory updates, safely. The guiding
 principle (from how commercial systems like Corvus/Gather work): **the drone
 system is a cycle-count feed, not a second source of truth.** It never writes
